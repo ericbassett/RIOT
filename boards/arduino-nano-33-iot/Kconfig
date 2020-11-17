@@ -1,0 +1,15 @@
+# Copyright (c) 2020 HAW Hamburg
+#
+# This file is subject to the terms and conditions of the GNU Lesser
+# General Public License v2.1. See the file LICENSE in the top level
+# directory for more details.
+
+config BOARD
+    default "arduino-nano-33-iot" if BOARD_ARDUINO_NANO_33_IOT
+
+config BOARD_ARDUINO_NANO_33_IOT
+    bool
+    default y
+    select BOARD_COMMON_ARDUINO_MKR
+
+source "$(RIOTBOARD)/common/arduino-samd21-nina/Kconfig"

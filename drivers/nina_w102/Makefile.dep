@@ -1,0 +1,7 @@
+USEMODULE +=  netdev_eth
+USEMODULE +=  xtimer
+USEMODULE += luid
+FEATURES_REQUIRED +=  periph_gpio_irq
+FEATURES_REQUIRED +=  periph_spi
+FEATURES_REQUIRED += periph_gpio
+USE_PKG += driver_nina_w102
