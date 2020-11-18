@@ -121,6 +121,7 @@ extern "C" {
 #define START_CMD                     0xE0
 #define END_CMD                       0xEE
 #define REPLY_FLAG                    1<<7
+#define ERR_CMD   	                  0xEF
 
 #ifdef __cplusplus
 }

@@ -49,24 +49,40 @@ extern "C" {
 #define NINA_W102_PARAM_SPI             SPI_DEV(1)
 #endif
 
-#ifndef NINA_W102_PARAMS_SPI_CLK
-#define NINA_W102_PARAMS_SPI_CLK        SPI_CLK_100KHZ
+#ifndef NINA_W102_PARAM_SPI_CLK
+#define NINA_W102_PARAM_SPI_CLK        SPI_CLK_100KHZ
 #endif
 
 #ifndef NINA_W102_PARAM_CS_PIN
-#define NINA_W102_PARAM_CS_PIN          GPIO_PIN(PA, 14)       /* PA14 */
+#define NINA_W102_PARAM_CS_PIN         GPIO_PIN(PA, 14)       /* PA14 */
 #endif
 
-#ifndef NINA_W102_PARAMS_SPI_MODE
-#define NINA_W102_PARAMS_SPI_MODE       SPI_MODE_0
+#ifndef NINA_W102_PARAM_SPI_MODE
+#define NINA_W102_PARAM_SPI_MODE       SPI_MODE_0
 #endif
+
+#ifndef NINA_W102_PARAM_ACK_PIN
+#define NINA_W102_PARAM_ACK_PIN        GPIO_PIN(PA, 28)
+#endif
+
+#ifndef NINA_W102_PARAM_RST_PIN
+#define NINA_W102_PARAM_RSTN_PIN       GPIO_PIN(PA, 8)
+#endif
+
+#ifndef NINA_W102_PARAM_GPIO0_PIN
+#define NINA_W102_PARAM_GPIO0_PIN      GPIO_PIN(PA, 27)
+#endif
+
 
 #ifndef NINA_W102_PARAMS
 #define NINA_W102_PARAMS   {                                               \
                               .spi         = NINA_W102_PARAM_SPI,          \
-                              .spi_clk     = NINA_W102_PARAMS_SPI_CLK,     \
-                              .spi_mode    = NINA_W102_PARAMS_SPI_MODE,    \
+                              .spi_clk     = NINA_W102_PARAM_SPI_CLK,     \
+                              .spi_mode    = NINA_W102_PARAM_SPI_MODE,    \
                               .cs_pin      = NINA_W102_PARAM_CS_PIN,       \
+                              .ack_pin     = NINA_W102_PARAM_ACK_PIN,      \
+                              .rstn_pin    = NINA_W102_PARAM_RSTN_PIN,      \
+                              .gpio0_pin   = NINA_W102_PARAM_GPIO0_PIN,    \
                             }
 #endif
 

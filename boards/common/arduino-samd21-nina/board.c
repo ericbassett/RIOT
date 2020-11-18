@@ -31,7 +31,16 @@ void board_init(void)
     // /* initialize the on-board Amber "L" LED */
     // gpio_init(LED0_PIN, GPIO_OUT);
     #ifdef MODULE_NINA_W102
+      // Initialize the SPI pins
       spi_init(NINA_W102_PARAM_SPI);
       spi_init_cs(NINA_W102_PARAM_SPI, NINA_W102_PARAM_CS_PIN);
+
+      // NINA - SPI boot
+      gpio_init(NINA_W102_PARAM_GPIO0_PIN, GPIO_OUT);
+      gpio_set(NINA_W102_PARAM_GPIO0_PIN);
+
+      // disable NINA
+      gpio_init(NINA_W102_PARAM_RSTN_PIN, GPIO_OUT);
+      gpio_clear(NINA_W102_PARAM_RSTN_PIN);
     #endif
 }

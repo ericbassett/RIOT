@@ -40,7 +40,10 @@ typedef struct {
     spi_t spi;              /**< SPI device */
     spi_clk_t spi_clk;      /**< SPI clock speed used */
     spi_mode_t spi_mode;    /**< SPI mode used */
-    gpio_t cs_pin;          /**< SPI CS pin (chip select LOW active) */    
+    gpio_t cs_pin;          /**< SPI CS pin (chip select LOW active) */
+    gpio_t ack_pin;         /**< SPI ACK pin (NiNa is ready) */
+    gpio_t rstn_pin;        /**< RESET pin (used on boot) */
+    gpio_t gpio0_pin;       /**< GPIO ZERO pin (used on boot) */    
     /* add initialization params here */
 } nina_w102_params_t;
 
@@ -78,18 +81,38 @@ int nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params);
  */
 int nina_w102_get_fw_ver(nina_w102_t *dev, char *version);
 
+/**
+ * @brief   Get device firmware version
+ *
+ * @param[inout] dev        Device descriptor of the driver
+ *
+ */
+uint8_t nina_w102_get_conn_stat(nina_w102_t *dev);
+
+/**
+ * @brief   Get device MAC Address
+ *
+ * @param[inout] dev        Device descriptor of the driver
+ *
+ */
+int nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id);
+
 typedef struct{
+  uint8_t start;
   uint8_t cmd;
   uint8_t num_params;
   uint8_t first_param_len;
 } nina_w102_cmd_response;
 
-void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam, nina_w102_cmd_response* resp);
+void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam, nina_w102_cmd_response* resp, bool cont);
 uint8_t _nina_w102_read_param_len8(nina_w102_t *dev, uint8_t* param_len);
-void _nina_w102_get_param(nina_w102_t *dev, void *param, uint8_t length);
+void _nina_w102_get_param(nina_w102_t *dev, void *param, uint8_t length, bool cont);
 uint8_t _nina_w102_get_param_len(nina_w102_t *dev);
 int nina_w102_get_scan_networks(nina_w102_t *dev, char networks[][50]);
 int nina_w102_start_scan_networks(nina_w102_t *dev);
+void _nina_w102_wait_ready(nina_w102_t *dev);
+void _nina_w102_select_slave(void);
+void _nina_w102_deselect_slave(void);
 
 #ifdef __cplusplus
 }

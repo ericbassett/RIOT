@@ -66,6 +66,9 @@ extern "C" {
  */
 #define NINA_W102_PARAM_SPI             SPI_DEV(1)
 #define NINA_W102_PARAM_CS_PIN          GPIO_PIN(PA, 14)
+#define NINA_W102_PARAM_ACK_PIN       GPIO_PIN(PA, 28)
+#define NINA_W102_PARAM_RSTN_PIN       GPIO_PIN(PA, 8)
+#define NINA_W102_PARAM_GPIO0_PIN     GPIO_PIN(PA, 27)
 /** @} */
 
 #ifdef __cplusplus
