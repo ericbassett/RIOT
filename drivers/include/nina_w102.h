@@ -104,15 +104,16 @@ typedef struct{
   uint8_t first_param_len;
 } nina_w102_cmd_response;
 
-void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam, nina_w102_cmd_response* resp, bool cont);
+void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam);
 uint8_t _nina_w102_read_param_len8(nina_w102_t *dev, uint8_t* param_len);
 void _nina_w102_get_param(nina_w102_t *dev, void *param, uint8_t length, bool cont);
 uint8_t _nina_w102_get_param_len(nina_w102_t *dev);
 int nina_w102_get_scan_networks(nina_w102_t *dev, char networks[][50]);
 int nina_w102_start_scan_networks(nina_w102_t *dev);
 void _nina_w102_wait_ready(nina_w102_t *dev);
-void _nina_w102_select_slave(void);
-void _nina_w102_deselect_slave(void);
+void _nina_w102_select_slave(nina_w102_t *dev);
+void _nina_w102_deselect_slave(nina_w102_t *dev);
+uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *data);
 
 #ifdef __cplusplus
 }

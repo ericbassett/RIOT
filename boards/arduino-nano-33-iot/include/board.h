@@ -30,34 +30,20 @@ extern "C" {
 #endif
 
 /**
- * @brief   The on-board LED is connected to pin 6 on this board
- */
-#define ARDUINO_LED         (6U)
-
-/**
  * @name    LED pin definitions and handlers
  * @{
  */
-#define LED0_PIN            GPIO_PIN(PA, 20)
+#define LED0_PIN            GPIO_PIN(PA, 17)
 
 #define LED_PORT            PORT->Group[PA]
-#define LED0_MASK           (1 << 20)
+#define LED0_MASK           (1 << 17)
 
 #define LED0_ON             (LED_PORT.OUTSET.reg = LED0_MASK)
 #define LED0_OFF            (LED_PORT.OUTCLR.reg = LED0_MASK)
 #define LED0_TOGGLE         (LED_PORT.OUTTGL.reg = LED0_MASK)
 
-#define LED0_NAME           "LED(Green)"
+#define LED0_NAME           "LED(Amber)"
 
-#define LED1_PIN            GPIO_PIN(PA, 17)
-
-#define LED1_MASK           (1 << 17)
-
-#define LED1_ON             (LED_PORT.OUTSET.reg = LED1_MASK)
-#define LED1_OFF            (LED_PORT.OUTCLR.reg = LED1_MASK)
-#define LED1_TOGGLE         (LED_PORT.OUTTGL.reg = LED1_MASK)
-
-#define LED1_NAME           "LED(Amber)"
 /** @} */
 
 /**
@@ -66,9 +52,9 @@ extern "C" {
  */
 #define NINA_W102_PARAM_SPI             SPI_DEV(1)
 #define NINA_W102_PARAM_CS_PIN          GPIO_PIN(PA, 14)
-#define NINA_W102_PARAM_ACK_PIN       GPIO_PIN(PA, 28)
-#define NINA_W102_PARAM_RSTN_PIN       GPIO_PIN(PA, 8)
-#define NINA_W102_PARAM_GPIO0_PIN     GPIO_PIN(PA, 27)
+#define NINA_W102_PARAM_ACK_PIN         GPIO_PIN(PA, 28)
+#define NINA_W102_PARAM_RSTN_PIN        GPIO_PIN(PA, 8)
+#define NINA_W102_PARAM_GPIO0_PIN       GPIO_PIN(PA, 27)
 /** @} */
 
 #ifdef __cplusplus

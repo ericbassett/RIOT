@@ -32,8 +32,8 @@ void board_init(void)
     // gpio_init(LED0_PIN, GPIO_OUT);
     #ifdef MODULE_NINA_W102
       // Initialize the SPI pins
-      spi_init(NINA_W102_PARAM_SPI);
       spi_init_cs(NINA_W102_PARAM_SPI, NINA_W102_PARAM_CS_PIN);
+      spi_init(NINA_W102_PARAM_SPI);      
 
       // NINA - SPI boot
       gpio_init(NINA_W102_PARAM_GPIO0_PIN, GPIO_OUT);
