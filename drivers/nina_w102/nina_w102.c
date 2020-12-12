@@ -28,67 +28,6 @@
 
 nina_w102_t nina_w102_dev;
 
-static int _nina_w102_send(netdev_t *netdev, const iolist_t *iolist) {
-    nina_w102_t *dev = (nina_w102_t *)netdev;
-
-    assert(dev);
-    assert(dev == nina_w102_dev);
-    assert(iolist);
-
-    if (!dev->connected) {
-        DEBUG("%s WiFi is still not connected to AP, cannot send", __func__);
-        return -ENODEV;
-    }
-
-    /* nina_w102_eth_buf should not be used for incoming packets here */
-    assert(dev->rx_buf == NULL);
-
-    uint32_t state = irq_disable();
-    uint16_t tx_len = 0;
-
-    /* load packet data into the buffer */
-    for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
-        if (tx_len + iol->iol_len > ETHERNET_MAX_LEN) {
-            irq_restore(state);
-            return -EOVERFLOW;
-        }
-        if (iol->iol_len) {
-            memcpy (atwinc15x0_eth_buf + tx_len, iol->iol_base, iol->iol_len);
-            tx_len += iol->iol_len;
-        }
-    }    
-
-}
-
-static int _nina_w102_recv(netdev_t *dev, void *buf, size_t len, void *info) {
-
-}
-
-static int _nina_w102_init(netdev_t *dev) {
-
-}
-
-static int _nina_w102_isr(netdev_t *dev) {
-
-}
-
-static int _nina_w102_get(netdev_t *dev, netopt_t opt, void *value, size_t max_len) {
-
-}
-
-static int _nina_w102_set(netdev_t *dev, netopt_t opt, const void *value, size_t value_len) {
-
-}
-
-const netdev_driver_t nina_w102_netdev_driver = {
-    .send = _nina_w102_send,
-    .recv = _nina_w102_recv,
-    .init = _nina_w102_init,
-    .isr = _nina_w102_isr,
-    .get = _nina_w102_get,
-    .set = _nina_w102_set,
-};
-
 uint8_t nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params)
 {
   gpio_init(params->ack_pin, GPIO_IN_PU);

@@ -120,12 +120,6 @@ void _nina_w102_send_param(nina_w102_t *dev, uint8_t* param, uint8_t param_len, 
 uint8_t _nina_w102_wait_response(nina_w102_t *dev, uint8_t cmd, uint8_t* num_params_read, uint8_t** params, uint8_t max_num_params);
 uint8_t nina_w102_connect(nina_w102_t *dev, const char* ssid, uint8_t ssid_len, const char *passphrase, uint8_t pass_len);
 uint8_t nina_w102_disconnect(nina_w102_t *dev);
-static int _nina_w102_send(netdev_t *netdev, const iolist_t *iolist);
-static int _nina_w102_recv(netdev_t *dev, void *buf, size_t len, void *info);
-static int _nina_w102_init(netdev_t *dev);
-static int _nina_w102_isr(netdev_t *dev);
-static int _nina_w102_get(netdev_t *dev, netopt_t opt, void *value, size_t max_len);
-static int _nina_w102_set(netdev_t *dev, netopt_t opt, const void *value, size_t value_len);
 
 #ifdef __cplusplus
 }
