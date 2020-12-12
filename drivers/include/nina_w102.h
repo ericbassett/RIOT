@@ -22,6 +22,7 @@
 #define NINA_W102_H
 
 #include "net/netdev.h"
+#include "net/ethernet.h"
 #include "periph/gpio.h"
 #include "periph/spi.h"
 
@@ -37,6 +38,7 @@ extern "C" {
  * @brief   Device initialization parameters
  */
 typedef struct {
+    netdev_t netdev;
     spi_t spi;              /**< SPI device */
     spi_clk_t spi_clk;      /**< SPI clock speed used */
     spi_mode_t spi_mode;    /**< SPI mode used */
@@ -70,7 +72,7 @@ typedef struct {
  *
  * @return                  0 on success
  */
-int nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params);
+uint8_t nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params);
 
 /**
  * @brief   Get device firmware version
@@ -79,7 +81,7 @@ int nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params);
  * @param[inout] char       Address to return firmware version to
  *
  */
-int nina_w102_get_fw_ver(nina_w102_t *dev, char *version);
+uint8_t nina_w102_get_fw_ver(nina_w102_t *dev, char *version);
 
 /**
  * @brief   Get device firmware version
@@ -95,7 +97,7 @@ uint8_t nina_w102_get_conn_stat(nina_w102_t *dev);
  * @param[inout] dev        Device descriptor of the driver
  *
  */
-int nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id);
+uint8_t nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id);
 
 typedef struct{
   uint8_t start;
@@ -108,12 +110,22 @@ void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam);
 uint8_t _nina_w102_read_param_len8(nina_w102_t *dev, uint8_t* param_len);
 void _nina_w102_get_param(nina_w102_t *dev, void *param, uint8_t length, bool cont);
 uint8_t _nina_w102_get_param_len(nina_w102_t *dev);
-int nina_w102_get_scan_networks(nina_w102_t *dev, char networks[][50]);
-int nina_w102_start_scan_networks(nina_w102_t *dev);
+uint8_t nina_w102_get_scan_networks(nina_w102_t *dev, char** networks, uint8_t max_networks);
+uint8_t nina_w102_start_scan_networks(nina_w102_t *dev);
 void _nina_w102_wait_ready(nina_w102_t *dev);
 void _nina_w102_select_slave(nina_w102_t *dev);
 void _nina_w102_deselect_slave(nina_w102_t *dev);
-uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *data);
+uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *param);
+void _nina_w102_send_param(nina_w102_t *dev, uint8_t* param, uint8_t param_len, uint8_t lastParam);
+uint8_t _nina_w102_wait_response(nina_w102_t *dev, uint8_t cmd, uint8_t* num_params_read, uint8_t** params, uint8_t max_num_params);
+uint8_t nina_w102_connect(nina_w102_t *dev, const char* ssid, uint8_t ssid_len, const char *passphrase, uint8_t pass_len);
+uint8_t nina_w102_disconnect(nina_w102_t *dev);
+static int _nina_w102_send(netdev_t *netdev, const iolist_t *iolist);
+static int _nina_w102_recv(netdev_t *dev, void *buf, size_t len, void *info);
+static int _nina_w102_init(netdev_t *dev);
+static int _nina_w102_isr(netdev_t *dev);
+static int _nina_w102_get(netdev_t *dev, netopt_t opt, void *value, size_t max_len);
+static int _nina_w102_set(netdev_t *dev, netopt_t opt, const void *value, size_t value_len);
 
 #ifdef __cplusplus
 }

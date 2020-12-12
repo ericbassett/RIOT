@@ -28,7 +28,68 @@
 
 nina_w102_t nina_w102_dev;
 
-int nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params)
+static int _nina_w102_send(netdev_t *netdev, const iolist_t *iolist) {
+    nina_w102_t *dev = (nina_w102_t *)netdev;
+
+    assert(dev);
+    assert(dev == nina_w102_dev);
+    assert(iolist);
+
+    if (!dev->connected) {
+        DEBUG("%s WiFi is still not connected to AP, cannot send", __func__);
+        return -ENODEV;
+    }
+
+    /* nina_w102_eth_buf should not be used for incoming packets here */
+    assert(dev->rx_buf == NULL);
+
+    uint32_t state = irq_disable();
+    uint16_t tx_len = 0;
+
+    /* load packet data into the buffer */
+    for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
+        if (tx_len + iol->iol_len > ETHERNET_MAX_LEN) {
+            irq_restore(state);
+            return -EOVERFLOW;
+        }
+        if (iol->iol_len) {
+            memcpy (atwinc15x0_eth_buf + tx_len, iol->iol_base, iol->iol_len);
+            tx_len += iol->iol_len;
+        }
+    }    
+
+}
+
+static int _nina_w102_recv(netdev_t *dev, void *buf, size_t len, void *info) {
+
+}
+
+static int _nina_w102_init(netdev_t *dev) {
+
+}
+
+static int _nina_w102_isr(netdev_t *dev) {
+
+}
+
+static int _nina_w102_get(netdev_t *dev, netopt_t opt, void *value, size_t max_len) {
+
+}
+
+static int _nina_w102_set(netdev_t *dev, netopt_t opt, const void *value, size_t value_len) {
+
+}
+
+const netdev_driver_t nina_w102_netdev_driver = {
+    .send = _nina_w102_send,
+    .recv = _nina_w102_recv,
+    .init = _nina_w102_init,
+    .isr = _nina_w102_isr,
+    .get = _nina_w102_get,
+    .set = _nina_w102_set,
+};
+
+uint8_t nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params)
 {
   gpio_init(params->ack_pin, GPIO_IN_PU);
   gpio_init(params->rstn_pin, GPIO_OUT);
@@ -45,8 +106,8 @@ int nina_w102_init(nina_w102_t *dev, const nina_w102_params_t *params)
   return 0;
 }
 
-int nina_w102_get_fw_ver(nina_w102_t *dev, char *version) {
-  int len;
+uint8_t nina_w102_get_fw_ver(nina_w102_t *dev, char *version) {
+  uint8_t len;
 
   // wait for ready
   _nina_w102_wait_ready(dev);
@@ -84,7 +145,7 @@ uint8_t nina_w102_get_conn_stat(nina_w102_t *dev) {
   // deselect slave manually to add delay
   _nina_w102_deselect_slave(dev);
 
-  // wait for ready
+  // wait for response
   _nina_w102_wait_response_cmd(dev, GET_CONN_STATUS_CMD, &r);
 
   // release bus
@@ -93,8 +154,9 @@ uint8_t nina_w102_get_conn_stat(nina_w102_t *dev) {
   return r;
 }
 
-int nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id) {
-  int len;
+uint8_t nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id) {
+  uint8_t len;
+  uint8_t _dummy = DUMMY_DATA;
 
   // wait for ready
   _nina_w102_wait_ready(dev);
@@ -102,11 +164,11 @@ int nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id) {
   // Aquire bus
   spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);
 
-  // Request send firmware version
+  // Request send mac address
   _nina_w102_send_cmd(dev, GET_MACADDR_CMD, PARAM_NUMS_1);
-  spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, 1);
-  spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
-  spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, END_CMD);
+  _nina_w102_send_param(dev, &_dummy, 1, LAST_PARAM);
+
+  // Pad to multiple of 4
   spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
   spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
 
@@ -122,78 +184,76 @@ int nina_w102_get_mac_id(nina_w102_t *dev, char* mac_id) {
   return len;
 }
 
-int nina_w102_start_scan_networks(nina_w102_t *dev) {
-  char version[10];
-  
+uint8_t nina_w102_start_scan_networks(nina_w102_t *dev) {
+  uint8_t r;
 
-  // Aquire bus
-  printf("Slave ready: %d\n", gpio_read(GPIO_PIN(PB, 03)));
+  // wait for ready
+  _nina_w102_wait_ready(dev);  
+
+  // Aquire bus  
   spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);
-  // gpio_set(GPIO_PIN(PA, 16));  
-  // Request scan networks
+
+  // Request start scanning networks
   _nina_w102_send_cmd(dev, START_SCAN_NETWORKS, PARAM_NUMS_0);
-  // xtimer_sleep(2);
 
-  // if (response.start != START_CMD || response.start == 0) {
-  //   while (response.start != START_CMD) {
-  //     response.start = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
-  //   }
-  //   response.cmd = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
-  //   response.num_params = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
-  //   response.first_param_len = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
-  // }
-  // printf("START\tCMD\tRESP\tACT\tNUM\tFIRST\n%#x\t%#x\t%#x\t%#x\t%d\t%d\n",
-  //       response.start, START_SCAN_NETWORKS, START_SCAN_NETWORKS | REPLY_FLAG, response.cmd, response.num_params, response.first_param_len);
+  // deselect slave manually to add delay
+  _nina_w102_deselect_slave(dev);
 
-  spi_transfer_bytes(dev->params.spi, dev->params.cs_pin, false, NULL, version, 1);
-  // printf("Response: %#x\n", version[0]);
-  // gpio_clear(GPIO_PIN(PA, 16));
-  // End transaction
+  // wait for response
+  _nina_w102_wait_response_cmd(dev, START_SCAN_NETWORKS, &r);
+
+  // release bus
   spi_release(dev->params.spi);
 
-  return 0;   
+  return r;
 }
 
-int nina_w102_get_scan_networks(nina_w102_t *dev, char networks[][50]) {
-  nina_w102_cmd_response response;
-  uint8_t param_len;
-  int num_networks;
+uint8_t nina_w102_disconnect(nina_w102_t *dev) {
+  uint8_t r;
 
-  response.cmd = 5;
-  response.first_param_len = 5;
-  response.num_params = 5;
-  response.start = 5;
-  
-  // Aquire bus
-  spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);  
-  
-  // Request networks from scan
-  _nina_w102_send_cmd(dev, SCAN_NETWORKS, PARAM_NUMS_0);
-  xtimer_sleep(2);
-  param_len = response.first_param_len;
-  num_networks = response.num_params;
-  printf("Response: %#x\n", response.cmd);
-  printf("Number of networks: %d\nFirst Network Length: %d\n", num_networks, param_len);
-  // if (response.num_params > 20) { num_networks = 20; }
-  for(int i = 0; i < num_networks - 1; i++) {
-    if (i < 20) {
-      _nina_w102_get_param(dev, networks[i], param_len, true);
-    }
-    else {
-      _nina_w102_get_param(dev, NULL, param_len, true);
-    }
-    param_len = _nina_w102_get_param_len(dev);
-    printf("Network[%d]: %s\nNext Network Length: %d\n", i, networks[i], param_len);
-  }
+  // wait for ready
+  _nina_w102_wait_ready(dev);  
 
-  _nina_w102_get_param(dev, networks[num_networks], param_len, false);
-    param_len = _nina_w102_get_param_len(dev);
-    printf("Network[%d]: %s\nNext Network Length: %d\n", num_networks, networks[num_networks], param_len);
+  // Aquire bus  
+  spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);
 
-  // End transaction
+  // Request disconnect
+  _nina_w102_send_cmd(dev, DISCONNECT_CMD, PARAM_NUMS_0);
+
+  // deselect slave manually to add delay
+  _nina_w102_deselect_slave(dev);
+
+  // wait for response
+  _nina_w102_wait_response_cmd(dev, DISCONNECT_CMD, &r);
+
+  // release bus
   spi_release(dev->params.spi);
 
-  return response.num_params;   
+  return r;
+}
+
+uint8_t nina_w102_get_scan_networks(nina_w102_t *dev, char** networks, uint8_t max_networks) {
+    uint8_t r;
+
+  // wait for ready
+  _nina_w102_wait_ready(dev);  
+
+  // Aquire bus  
+  spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);
+
+  // Request start scanning networks
+  _nina_w102_send_cmd(dev, SCAN_NETWORKS, PARAM_NUMS_0);
+
+  // deselect slave manually to add delay
+  _nina_w102_deselect_slave(dev);
+
+  // wait for response
+  _nina_w102_wait_response(dev, SCAN_NETWORKS, &r, (uint8_t **) networks, max_networks);
+
+  // release bus
+  spi_release(dev->params.spi);
+  
+  return r;
 }
 
 void _nina_w102_get_param(nina_w102_t *dev, void *param, uint8_t length, bool cont) {
@@ -223,6 +283,19 @@ void _nina_w102_send_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t numParam) {
   }    
 }
 
+void _nina_w102_send_param(nina_w102_t *dev, uint8_t* param, uint8_t param_len, uint8_t lastParam) {
+  // send length
+  spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, param_len);
+
+  // send param
+  spi_transfer_bytes(dev->params.spi, dev->params.cs_pin, true, param, NULL, param_len);
+
+  // end
+  if (lastParam) {
+    spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, END_CMD);
+  }
+}
+
 uint8_t _nina_w102_read_param_len8(nina_w102_t *dev, uint8_t* param_len)
 {
     uint8_t _param_len;
@@ -237,7 +310,7 @@ uint8_t _nina_w102_read_param_len8(nina_w102_t *dev, uint8_t* param_len)
     return _param_len;
 }
 
-uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *data) {
+uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *param) {
   // timeout
   uint8_t c = 0;
 
@@ -285,7 +358,7 @@ uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *dat
   len = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
 
   // Get param
-  spi_transfer_bytes(dev->params.spi, dev->params.cs_pin, true, NULL, data, len);
+  spi_transfer_bytes(dev->params.spi, dev->params.cs_pin, true, NULL, param, len);
   
   // Get END_CMD
   if (END_CMD != spi_transfer_byte(dev->params.spi, dev->params.cs_pin, false, DUMMY_DATA)) {
@@ -293,6 +366,120 @@ uint8_t _nina_w102_wait_response_cmd(nina_w102_t *dev, uint8_t cmd, uint8_t *dat
   }
 
   return len;
+}
+
+uint8_t _nina_w102_wait_response(nina_w102_t *dev, uint8_t cmd, uint8_t* num_params_read, uint8_t** params, uint8_t max_num_params) {
+  // timeout
+  uint8_t c = 0;
+
+  // line up pointer array
+  char *index[WL_SSID_MAX_LENGTH];
+
+  for (int8_t i = 0; i < WL_NETWORKS_LIST_MAXNUM; i++) {
+    index[i] = (char *) params + WL_SSID_MAX_LENGTH * i;
+  }
+
+  // temp vars
+  uint8_t resp, n_params, n_params_raw;
+  uint8_t len = 0;
+  int8_t i_param;
+
+  // wait for device ready
+  _nina_w102_wait_ready(dev);
+  
+  // Receive response
+  do {
+    resp = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
+    printf("c: %d\tr: %#X\n", c, resp);    
+  } while (resp != START_CMD && c++ < 100 && resp != ERR_CMD);
+
+  // timeout
+  if (c >= 100) {
+    return -1;
+  }
+
+  // Check for error
+  if (resp == ERR_CMD) {
+    if (PARAM_NUMS_0 == spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA))
+    {
+      if (END_CMD == spi_transfer_byte(dev->params.spi, dev->params.cs_pin, false, DUMMY_DATA)) {
+        return -1;
+      }
+    }
+    return -1;
+  }
+
+  // Check for replied command
+  if ((REPLY_FLAG | cmd) != spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA)) {
+    return -1;
+  }
+
+  // Check number of response commands
+  n_params_raw = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
+
+  if (n_params_raw > max_num_params) {
+    n_params = max_num_params;
+  }
+  else {
+    n_params = n_params_raw;
+  }
+  
+  // Get response params
+  for (i_param = 0; i_param < n_params; ++i_param) {
+    len = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
+    spi_transfer_bytes(dev->params.spi, dev->params.cs_pin, true, NULL, index[i_param], len);
+    
+    // null terminate
+    index[i_param][len] = '\0';
+  }
+  
+  // Get END_CMD
+  do {
+    resp = spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
+    printf("c: %d\tr: %#X\n", c, resp);    
+  } while (resp != END_CMD && c++ < 100);
+
+  // timeout
+  if (c >= 100) {
+    return -1;
+  }
+
+  *num_params_read = i_param;
+
+  return len;  
+}
+
+uint8_t nina_w102_connect(nina_w102_t *dev, const char* ssid, uint8_t ssid_len, const char *passphrase, uint8_t pass_len) {
+  uint8_t len, r;
+
+  // wait for ready
+  _nina_w102_wait_ready(dev);
+
+  // Aquire bus
+  spi_acquire(dev->params.spi, dev->params.cs_pin, dev->params.spi_mode, dev->params.spi_clk);
+
+  // Send ssid then passphrase
+  _nina_w102_send_cmd(dev, SET_PASSPHRASE_CMD, PARAM_NUMS_2);
+  _nina_w102_send_param(dev, (uint8_t *)ssid, ssid_len, NO_LAST_PARAM);
+  _nina_w102_send_param(dev, (uint8_t *)passphrase, pass_len, LAST_PARAM);
+
+  // Pad to multiple of 4
+  uint8_t cmd_sz = 6 + ssid_len + pass_len;
+  while (cmd_sz % 4) {
+    spi_transfer_byte(dev->params.spi, dev->params.cs_pin, true, DUMMY_DATA);
+    ++cmd_sz;
+  }
+
+  // deselect slave
+  _nina_w102_deselect_slave(dev);
+
+  // wait for response
+  len = _nina_w102_wait_response_cmd(dev, SET_PASSPHRASE_CMD, &r);
+
+  // release bus
+  spi_release(dev->params.spi);
+
+  return len; 
 }
 
 void _nina_w102_wait_ready(nina_w102_t *dev) {
