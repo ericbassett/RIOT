@@ -49,11 +49,26 @@ static const uart_conf_t uart_config[] = {
         .tx_pad   = UART_PAD_TX_2,
         .flags    = UART_FLAG_NONE,
         .gclk_src = SAM0_GCLK_MAIN,
+    },
+    {
+        .dev      = &SERCOM3->USART,
+        .rx_pin   = GPIO_PIN(PA,23),  /* ARDUINO_PIN_13, RX Pin */
+        .tx_pin   = GPIO_PIN(PA,22),  /* ARDUINO_PIN_14, TX Pin */
+#ifdef MODULE_PERIPH_UART_HW_FC
+        .rts_pin  = GPIO_PIN(PA,14),
+        .cts_pin  = GPIO_PIN(PA,15),
+#endif
+        .mux      = GPIO_MUX_C,
+        .rx_pad   = UART_PAD_RX_1,
+        .tx_pad   = UART_PAD_TX_0,
+        .flags    = UART_FLAG_NONE,
+        .gclk_src = SAM0_GCLK_MAIN,
     }
 };
 
 /* interrupt function name mapping */
 #define UART_0_ISR          isr_sercom5
+#define UART_1_ISR          isr_sercom3
 
 #define UART_NUMOF          ARRAY_SIZE(uart_config)
 /** @} */

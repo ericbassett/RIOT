@@ -1,0 +1,2 @@
+# write here the flasher tool and stdio configurations
+include $(RIOTBOARD)/common/esp32/Makefile.include
