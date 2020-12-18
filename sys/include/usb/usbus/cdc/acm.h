@@ -88,7 +88,17 @@ typedef enum {
     /**
      * @brief DTE (e.g. a personal computer) is present and connected
      */
-    USBUS_CDC_ACM_LINE_STATE_DTE
+    USBUS_CDC_ACM_LINE_STATE_DTE,
+
+    /**
+     * @brief Carrier control is activated for half duplex modems.
+     */
+    USBUS_CDC_ACM_LINE_STATE_CARRIER,
+    
+    /**
+     * @brief Carrier control is activated for half duplex modems.
+     */
+    USBUS_CDC_ACM_LINE_STATE_CARRIER_DTE
 } usbus_cdcacm_line_state_t;
 
 /**
@@ -104,8 +114,10 @@ typedef struct usbus_cdcacm_device usbus_cdcacm_device_t;
  * @param[in]   cdcacm  CDC ACM handler context
  * @param[in]   data    ptr to the data
  * @param[in]   len     Length of the received data
+ * 
+ * @return              Length of data handled by callback
  */
-typedef void (*usbus_cdcacm_cb_t)(usbus_cdcacm_device_t *cdcacm,
+typedef size_t (*usbus_cdcacm_cb_t)(usbus_cdcacm_device_t *cdcacm,
                                   uint8_t *data, size_t len);
 
 /**
@@ -141,6 +153,7 @@ struct usbus_cdcacm_device {
     size_t occupied;                    /**< Number of bytes for the host    */
     usbus_cdcacm_line_state_t state;    /**< Current line state              */
     event_t flush;                      /**< device2host forced flush event  */
+    event_t retry;                      /**< buffer full, retry transfer     */
     usb_req_cdcacm_coding_t coding;     /**< Current coding configuration    */
 };
 

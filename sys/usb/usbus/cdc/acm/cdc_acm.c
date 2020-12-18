@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "tsrb.h"
+#include "event.h"
 #include "usb/descriptor.h"
 #include "usb/cdc.h"
 #include "usb/descriptor.h"
@@ -40,6 +41,7 @@ static void _transfer_handler(usbus_t *usbus, usbus_handler_t *handler,
                              usbdev_ep_t *ep, usbus_event_transfer_t event);
 
 static void _handle_flush(event_t *ev);
+static void _handle_retry(event_t *ev);
 
 static const usbus_handler_driver_t cdc_driver = {
     .init = _init,
@@ -206,6 +208,7 @@ static void _init(usbus_t *usbus, usbus_handler_t *handler)
     usbus_cdcacm_device_t *cdcacm = (usbus_cdcacm_device_t*)handler;
 
     cdcacm->flush.handler = _handle_flush;
+    cdcacm->retry.handler = _handle_retry;
 
     cdcacm->cdcacm_descr.next = NULL;
     cdcacm->cdcacm_descr.funcs = &_cdcacm_descriptor;
@@ -293,12 +296,19 @@ static int _control_handler(usbus_t *usbus, usbus_handler_t *handler,
         case USB_CDC_MGNT_REQUEST_SET_CONTROL_LINE_STATE:
             if (setup->value & USB_CDC_ACM_CONTROL_LINE_DTE) {
                 DEBUG("CDC ACM: DTE enabled on interface %u\n", setup->index);
-                cdcacm->state = USBUS_CDC_ACM_LINE_STATE_DTE;
+                if(setup->value & USB_CDC_ACM_CONTROL_LINE_CARRIER) {
+                  cdcacm->state = USBUS_CDC_ACM_LINE_STATE_CARRIER_DTE;                  
+                } else {
+                  cdcacm->state = USBUS_CDC_ACM_LINE_STATE_DTE;
+                }                                
                 usbus_endpoint_t *data_out = usbus_interface_find_endpoint(
                         &cdcacm->iface_data, USB_EP_TYPE_BULK, USB_EP_DIR_OUT);
                 assert(data_out);
                 usbdev_ep_ready(data_out->ep, 0);
                 usbus_cdc_acm_flush(cdcacm);
+            } else if (setup->value & USB_CDC_ACM_CONTROL_LINE_CARRIER) {
+                DEBUG("CDC ACM: Carrier control enabled on interface %u\n", setup->index);               
+                cdcacm->state = USBUS_CDC_ACM_LINE_STATE_CARRIER;
             }
             else {
                 cdcacm->state = USBUS_CDC_ACM_LINE_STATE_DISCONNECTED;
@@ -315,8 +325,7 @@ static int _control_handler(usbus_t *usbus, usbus_handler_t *handler,
 static void _handle_in(usbus_cdcacm_device_t *cdcacm,
                        usbdev_ep_t *ep)
 {
-    if ((cdcacm->usbus->state != USBUS_STATE_CONFIGURED) ||
-        (cdcacm->state != USBUS_CDC_ACM_LINE_STATE_DTE)) {
+      if (cdcacm->usbus->state != USBUS_STATE_CONFIGURED) {
         return;
     }
     /* copy at most CONFIG_USBUS_CDC_ACM_BULK_EP_SIZE chars from input into ep->buf */
@@ -342,10 +351,12 @@ static void _transfer_handler(usbus_t *usbus, usbus_handler_t *handler,
         size_t len;
         /* Retrieve incoming data */
         usbdev_ep_get(ep, USBOPT_EP_AVAILABLE, &len, sizeof(size_t));
+        
         if (len > 0) {
-            cdcacm->cb(cdcacm, ep->buf, len);
+          if(cdcacm->cb(cdcacm, ep->buf, len)) {
+            usbdev_ep_ready(ep, 0);
+          }
         }
-        usbdev_ep_ready(ep, 0);
     }
     if ((ep->dir == USB_EP_DIR_IN) && (ep->type == USB_EP_TYPE_BULK)) {
         cdcacm->occupied = 0;
@@ -362,6 +373,19 @@ static void _handle_flush(event_t *ev)
     if (cdcacm->occupied == 0) {
         _handle_in(cdcacm, cdcacm->iface_data.ep->next->ep);
     }
+}
+
+static void _handle_retry(event_t *ev)
+{
+    usbus_cdcacm_device_t *cdcacm = container_of(ev, usbus_cdcacm_device_t,
+                                                 retry);
+    usbdev_ep_t *ep_bulk_out = cdcacm->iface_data.ep->ep;
+    (void) ep_bulk_out;
+    (void) cdcacm;
+    // gpio_set(LED0_PIN);
+
+    _transfer_handler(cdcacm->usbus, (usbus_handler_t *) &cdcacm,
+                                ep_bulk_out, USBUS_EVENT_TRANSFER_COMPLETE);
 }
 
 static void _handle_reset(usbus_handler_t *handler)

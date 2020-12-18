@@ -42,6 +42,10 @@ static uint8_t _cdc_tx_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE];
 static uint8_t _cdc_rx_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE];
 static isrpipe_t _cdc_stdio_isrpipe = ISRPIPE_INIT(_cdc_rx_buf_mem);
 
+static uint8_t _boot_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE * 32];
+static isrpipe_t _boot_isrpipe = ISRPIPE_INIT(_boot_buf_mem);
+isrpipe_t *_boot_isrpipe_ptr = &_boot_isrpipe;
+
 void stdio_init(void)
 {
     /* Initialize this side of the CDC ACM pipe */
@@ -70,17 +74,25 @@ ssize_t stdio_write(const void* buffer, size_t len)
     return (char *)buffer - start;
 }
 
-static void _cdc_acm_rx_pipe(usbus_cdcacm_device_t *cdcacm,
+static size_t _cdc_acm_rx_pipe(usbus_cdcacm_device_t *cdcacm,
                              uint8_t *data, size_t len)
 {
     (void)cdcacm;
-    for (size_t i = 0; i < len; i++) {
-        isrpipe_write_one(&_cdc_stdio_isrpipe, data[i]);
+    size_t i;
+    if (len > tsrb_free(&_boot_isrpipe.tsrb))
+      return 0;
+    for (i = 0; i < len; i++) {
+      isrpipe_write_one(&_cdc_stdio_isrpipe, data[i]);
+      if(isrpipe_write_one(&_boot_isrpipe, data[i]) < 0) {
+        break;
+      }     
     }
+    return i;
 }
 
 void usb_cdc_acm_stdio_init(usbus_t *usbus)
 {
+  (void) _boot_isrpipe_ptr;
     usbus_cdc_acm_init(usbus, &cdcacm, _cdc_acm_rx_pipe, NULL,
                        _cdc_tx_buf_mem, sizeof(_cdc_tx_buf_mem));
 #ifdef MODULE_USB_BOARD_RESET
