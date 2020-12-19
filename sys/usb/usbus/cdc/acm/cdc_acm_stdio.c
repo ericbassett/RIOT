@@ -37,14 +37,21 @@
 #include "usb_board_reset_internal.h"
 #endif
 
+#define UART_THREAD_CDC_FULL_FLAG   (_U_(0x1) << 3)
+#define NINA_BUFF_SZ                (128 * 16)
+
 static usbus_cdcacm_device_t cdcacm;
 static uint8_t _cdc_tx_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE];
-static uint8_t _cdc_rx_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE];
+static uint8_t _cdc_rx_buf_mem[NINA_BUFF_SZ];
 static isrpipe_t _cdc_stdio_isrpipe = ISRPIPE_INIT(_cdc_rx_buf_mem);
 
-static uint8_t _boot_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE * 32];
+static uint8_t _boot_buf_mem[CONFIG_USBUS_CDC_ACM_STDIO_BUF_SIZE];
 static isrpipe_t _boot_isrpipe = ISRPIPE_INIT(_boot_buf_mem);
 isrpipe_t *_boot_isrpipe_ptr = &_boot_isrpipe;
+isrpipe_t *_cdc_stdio_isrpipe_ptr = &_cdc_stdio_isrpipe;
+
+static bool data_in_ep_disabled = false;
+static uint16_t bulk_out_maxpacketsize = 64;
 
 void stdio_init(void)
 {
@@ -58,7 +65,17 @@ ssize_t stdio_read(void* buffer, size_t len)
 {
     (void)buffer;
     (void)len;
-    return isrpipe_read(&_cdc_stdio_isrpipe, buffer, len);
+    ssize_t ret = isrpipe_read(&_cdc_stdio_isrpipe, buffer, len);
+    if (data_in_ep_disabled && ret > 0) {      
+      // gpio_clear(LED0_PIN);
+      // data_in_ep_disabled = false;
+      // usbus_event_post(cdcacm.usbus, &cdcacm.retry);      
+      if (tsrb_free(&_cdc_stdio_isrpipe.tsrb) >= bulk_out_maxpacketsize) {        
+        data_in_ep_disabled = false;
+        usbus_event_post(cdcacm.usbus, &cdcacm.retry);
+      }      
+    }
+    return ret;
 }
 
 ssize_t stdio_write(const void* buffer, size_t len)
@@ -67,6 +84,7 @@ ssize_t stdio_write(const void* buffer, size_t len)
     do {
         size_t n = usbus_cdc_acm_submit(&cdcacm, buffer, len);
         usbus_cdc_acm_flush(&cdcacm);
+        // usbus_event_post(cdcacm.usbus, &cdcacm.flush);
         /* Use tsrb and flush */
         buffer = (char *)buffer + n;
         len -= n;
@@ -79,14 +97,20 @@ static size_t _cdc_acm_rx_pipe(usbus_cdcacm_device_t *cdcacm,
 {
     (void)cdcacm;
     size_t i;
-    if (len > tsrb_free(&_boot_isrpipe.tsrb))
+
+    if (len > tsrb_free(&_cdc_stdio_isrpipe.tsrb)) {
+      data_in_ep_disabled = true;
+      // gpio_set(LED0_PIN);
       return 0;
+    }
     for (i = 0; i < len; i++) {
-      isrpipe_write_one(&_cdc_stdio_isrpipe, data[i]);
-      if(isrpipe_write_one(&_boot_isrpipe, data[i]) < 0) {
+      // isrpipe_write_one(&_cdc_stdio_isrpipe, data[i]);
+      (void) _boot_isrpipe;
+      if(isrpipe_write_one(&_cdc_stdio_isrpipe, data[i]) < 0) {
         break;
       }     
     }
+    if (i != len) gpio_set(LED0_PIN);
     return i;
 }
 
@@ -95,6 +119,7 @@ void usb_cdc_acm_stdio_init(usbus_t *usbus)
   (void) _boot_isrpipe_ptr;
     usbus_cdc_acm_init(usbus, &cdcacm, _cdc_acm_rx_pipe, NULL,
                        _cdc_tx_buf_mem, sizeof(_cdc_tx_buf_mem));
+    // bulk_out_maxpacketsize = cdcacm.iface_data.ep->maxpacketsize;
 #ifdef MODULE_USB_BOARD_RESET
     usbus_cdc_acm_set_coding_cb(&cdcacm, usb_board_reset_coding_cb);
 #endif

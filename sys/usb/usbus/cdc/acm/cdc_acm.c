@@ -163,6 +163,7 @@ size_t usbus_cdc_acm_submit(usbus_cdcacm_device_t *cdcacm, const uint8_t *buf, s
     if (len > n) {
         n += tsrb_drop(&cdcacm->tsrb, len - n);
         buf += len - n;
+        gpio_set(LED0_PIN);
     } else {
         n = len;
     }
@@ -325,7 +326,7 @@ static int _control_handler(usbus_t *usbus, usbus_handler_t *handler,
 static void _handle_in(usbus_cdcacm_device_t *cdcacm,
                        usbdev_ep_t *ep)
 {
-      if (cdcacm->usbus->state != USBUS_STATE_CONFIGURED) {
+    if (cdcacm->usbus->state != USBUS_STATE_CONFIGURED) {
         return;
     }
     /* copy at most CONFIG_USBUS_CDC_ACM_BULK_EP_SIZE chars from input into ep->buf */
