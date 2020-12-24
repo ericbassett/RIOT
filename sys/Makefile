@@ -140,8 +140,8 @@ endif
 ifneq (,$(filter posix_sockets,$(USEMODULE)))
   DIRS += posix/sockets
 endif
-ifneq (,$(filter posix_time,$(USEMODULE)))
-  DIRS += posix/time
+ifneq (,$(filter posix_sleep,$(USEMODULE)))
+  DIRS += posix/sleep
 endif
 ifneq (,$(filter pthread,$(USEMODULE)))
   DIRS += posix/pthread
@@ -157,6 +157,9 @@ ifneq (,$(filter shell_commands,$(USEMODULE)))
 endif
 ifneq (,$(filter suit%,$(USEMODULE)))
   DIRS += suit
+endif
+ifneq (,$(filter sys_bus,$(USEMODULE)))
+  DIRS += bus
 endif
 ifneq (,$(filter tcp,$(USEMODULE)))
   DIRS += net/transport_layer/tcp

@@ -15,6 +15,8 @@
  * @author  Oliver Hahm <oliver.hahm@inria.fr>
  */
 
+#include <assert.h>
+#include <limits.h>
 #include <string.h>
 #include <kernel_defines.h>
 
@@ -30,6 +32,9 @@
 #if IS_USED(MODULE_GNRC_NETIF_PKTQ)
 #include "net/gnrc/netif/pktq.h"
 #endif /* IS_USED(MODULE_GNRC_NETIF_PKTQ) */
+#if IS_USED(MODULE_GNRC_SIXLOWPAN_FRAG_SFR)
+#include "net/gnrc/sixlowpan/frag/sfr.h"
+#endif /* IS_USED(MODULE_GNRC_SIXLOWPAN_FRAG_SFR) */
 #if IS_USED(MODULE_NETSTATS)
 #include "net/netstats.h"
 #endif /* IS_USED(MODULE_NETSTATS) */
@@ -43,18 +48,8 @@
 #include "net/gnrc/netif.h"
 #include "net/gnrc/netif/internal.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG 0
 #include "debug.h"
-
-#ifdef MODULE_GNRC_NETIF_EVENTS
-/**
- * @brief   Event type used for passing netdev pointers together with the event
- */
-typedef struct {
-    event_t super;
-    netdev_t *dev;
-} event_netdev_t;
-#endif /* MODULE_GNRC_NETIF_EVENTS */
 
 static void _update_l2addr_from_dev(gnrc_netif_t *netif);
 static void _configure_netdev(netdev_t *dev);
@@ -123,6 +118,31 @@ unsigned gnrc_netif_numof(void)
 gnrc_netif_t *gnrc_netif_iter(const gnrc_netif_t *prev)
 {
     return (gnrc_netif_t*) netif_iter((netif_t*) prev);
+}
+
+gnrc_netif_t *gnrc_netif_get_by_type(netdev_type_t type, uint8_t index)
+{
+    gnrc_netif_t *netif = NULL;
+    while ((netif = gnrc_netif_iter(netif))) {
+
+#ifdef MODULE_NETDEV_REGISTER
+        if (netif->dev->type != type && type != NETDEV_ANY) {
+            continue;
+        }
+
+        if (netif->dev->index != index && index != NETDEV_INDEX_ANY) {
+            continue;
+        }
+#else
+        (void)type;
+        (void)index;
+        assert(index == 0);
+#endif
+
+        return netif;
+    }
+
+    return NULL;
 }
 
 int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
@@ -561,6 +581,7 @@ int gnrc_netif_ipv6_addr_add_internal(gnrc_netif_t *netif,
               PRIkernel_pid "\n",
               ipv6_addr_to_str(addr_str, addr, sizeof(addr_str)),
               netif->pid);
+        gnrc_netif_release(netif);
         return res;
     }
 #else  /* CONFIG_GNRC_IPV6_NIB_ARSM */
@@ -725,12 +746,44 @@ gnrc_netif_t *gnrc_netif_get_by_prefix(const ipv6_addr_t *prefix)
     return best_netif;
 }
 
+static int _netif_ops_set_helper(gnrc_netif_t *netif, netopt_t opt,
+                                 void *data, uint16_t data_len)
+{
+    gnrc_netapi_opt_t netapi_opt = {
+        .opt = opt,
+        .data = data,
+        .data_len = data_len,
+    };
+    return netif->ops->set(netif, &netapi_opt);
+}
+
 int gnrc_netif_ipv6_group_join_internal(gnrc_netif_t *netif,
                                         const ipv6_addr_t *addr)
 {
+    uint8_t l2_group_data[GNRC_NETIF_L2ADDR_MAXLEN];
     unsigned idx = UINT_MAX;
+    int l2_group_len;
 
+    /* can be called out of lock */
+    l2_group_len = gnrc_netif_ipv6_group_to_l2_group(netif, addr,
+                                                     l2_group_data);
     gnrc_netif_acquire(netif);
+    if (l2_group_len > 0) {
+        int res = _netif_ops_set_helper(netif, NETOPT_L2_GROUP,
+                                        l2_group_data, (uint16_t)l2_group_len);
+        /* link layer does not support multicast, but we can still use
+         * broadcast */
+        if ((res != -ENOTSUP) && (res < 0)) {
+            gnrc_netif_release(netif);
+            return res;
+        }
+    }
+    /* link layer does not support multicast, but we can still use
+     * broadcast */
+    else if (l2_group_len != -ENOTSUP) {
+        gnrc_netif_release(netif);
+        return l2_group_len;
+    }
     for (unsigned i = 0; i < GNRC_NETIF_IPV6_GROUPS_NUMOF; i++) {
         if (ipv6_addr_equal(&netif->ipv6.groups[i], addr)) {
             gnrc_netif_release(netif);
@@ -756,11 +809,56 @@ int gnrc_netif_ipv6_group_join_internal(gnrc_netif_t *netif,
 void gnrc_netif_ipv6_group_leave_internal(gnrc_netif_t *netif,
                                           const ipv6_addr_t *addr)
 {
-    int idx;
+    uint8_t l2_group_data[GNRC_NETIF_L2ADDR_MAXLEN];
+    int idx = -1, l2_group_len;
+    /* IPv6 addresses that correspond to the same L2 address */
+    unsigned l2_groups = 0;
 
     assert((netif != NULL) && (addr != NULL));
+    /* can be called out of lock */
+    l2_group_len = gnrc_netif_ipv6_group_to_l2_group(netif, addr,
+                                                     l2_group_data);
+    /* link layer does not support multicast, but might still have used
+     * broadcast */
+    if ((l2_group_len < 0) && (l2_group_len != -ENOTSUP)) {
+        return;
+    }
     gnrc_netif_acquire(netif);
-    idx = _group_idx(netif, addr);
+    for (unsigned i = 0; i < GNRC_NETIF_IPV6_GROUPS_NUMOF; i++) {
+        if (l2_group_len > 0) {
+            uint8_t tmp[GNRC_NETIF_L2ADDR_MAXLEN];
+            if (!ipv6_addr_is_unspecified(&netif->ipv6.groups[i]) &&
+                (gnrc_netif_ipv6_group_to_l2_group(netif,
+                                                   &netif->ipv6.groups[i],
+                                                   tmp) == l2_group_len)) {
+                if (memcmp(tmp, l2_group_data, l2_group_len) == 0) {
+                    l2_groups++;
+                }
+            }
+        }
+        if (ipv6_addr_equal(&netif->ipv6.groups[i], addr)) {
+            idx = i;
+        }
+    }
+    if (idx < 0) {
+        gnrc_netif_release(netif);
+        return;
+    }
+    /* we need to have found at least one corresponding group for the IPv6
+     * group we want to leave when link layer supports multicast */
+    assert((l2_group_len == -ENOTSUP) || (l2_groups > 0));
+    /* we only found exactly IPv6 multicast address that corresponds to
+     * `l2_group_data`, so we can remove it, if there would be more, we need
+     * to stay in the group */
+    if (l2_groups == 1) {
+        int res = _netif_ops_set_helper(netif, NETOPT_L2_GROUP_LEAVE,
+                                        l2_group_data, (uint16_t)l2_group_len);
+        /* link layer does not support multicast, but might still have used
+         * broadcast */
+        if ((res != -ENOTSUP) && (res < 0)) {
+            DEBUG("gnrc_netif: error leaving link layer group\n");
+        }
+    }
     if (idx >= 0) {
         ipv6_addr_set_unspecified(&netif->ipv6.groups[idx]);
         /* TODO:
@@ -1208,7 +1306,11 @@ static void _test_options(gnrc_netif_t *netif)
 #if IS_USED(MODULE_GNRC_NETIF_IPV6)
             switch (netif->device_type) {
                 case NETDEV_TYPE_BLE:
+#if IS_ACTIVE(CONFIG_GNRC_NETIF_NONSTANDARD_6LO_MTU)
+                    assert(netif->ipv6.mtu >= IPV6_MIN_MTU);
+#else
                     assert(netif->ipv6.mtu == IPV6_MIN_MTU);
+#endif /* IS_ACTIVE(CONFIG_GNRC_NETIF_NONSTANDARD_6LO_MTU) */
                     break;
                 case NETDEV_TYPE_ETHERNET:
                     assert(netif->ipv6.mtu == ETHERNET_DATA_LEN);
@@ -1290,6 +1392,9 @@ void gnrc_netif_default_init(gnrc_netif_t *netif)
     _init_from_device(netif);
 #ifdef DEVELHELP
     _test_options(netif);
+#endif
+#if IS_USED(MODULE_GNRC_SIXLOWPAN_FRAG_SFR)
+    gnrc_sixlowpan_frag_sfr_init_iface(netif);
 #endif
     netif->cur_hl = CONFIG_GNRC_NETIF_DEFAULT_HL;
 #ifdef MODULE_GNRC_IPV6_NIB
@@ -1448,6 +1553,9 @@ static void _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt, bool push_back)
         }
         else {
             LOG_ERROR("gnrc_netif: can't queue packet for sending\n");
+            /* If we got here, it means the device was busy and the pkt queue
+             * was full. The packet should be dropped here anyway */
+            gnrc_pktbuf_release_error(pkt, ENOMEM);
         }
         return;
     }
@@ -1642,6 +1750,7 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
                 break;
 #if IS_USED(MODULE_NETSTATS_L2) || IS_USED(MODULE_GNRC_NETIF_PKTQ)
             case NETDEV_EVENT_TX_COMPLETE:
+            case NETDEV_EVENT_TX_COMPLETE_DATA_PENDING:
                 /* send packet previously queued within netif due to the lower
                  * layer being busy.
                  * Further packets will be sent on later TX_COMPLETE or
@@ -1656,6 +1765,7 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 #endif  /* IS_USED(MODULE_NETSTATS_L2) || IS_USED(MODULE_GNRC_NETIF_PKTQ) */
 #if IS_USED(MODULE_NETSTATS_L2) || IS_USED(MODULE_GNRC_NETIF_PKTQ)
             case NETDEV_EVENT_TX_MEDIUM_BUSY:
+            case NETDEV_EVENT_TX_NOACK:
                 /* send packet previously queued within netif due to the lower
                  * layer being busy.
                  * Further packets will be sent on later TX_COMPLETE or

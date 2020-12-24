@@ -1,5 +1,5 @@
 MODULE = board
 
-DIRS = $(RIOTBOARD)/common/arduino-samd21-nina
+DIRS = $(RIOTBOARD)/common/samd21-arduino-bootloader
 
 include $(RIOTBASE)/Makefile.base

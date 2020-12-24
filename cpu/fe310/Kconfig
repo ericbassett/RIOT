@@ -8,6 +8,7 @@
 config CPU_ARCH_RISCV
     bool
     select HAS_ARCH_RISCV
+    select HAS_PICOLIBC if '$(RIOT_CI_BUILD)' != '1'
 
 config CPU_CORE_RV32M
     bool
@@ -63,3 +64,5 @@ config CPU_MODEL
 
 config CPU
     default "fe310" if CPU_FAM_FE310
+
+rsource "Kconfig.clk"

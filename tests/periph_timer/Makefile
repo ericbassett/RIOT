@@ -12,8 +12,10 @@ BOARDS_TIMER_250kHz := \
     #
 
 BOARDS_TIMER_32kHz := \
+    e180-zg120b-tb \
     hifive1 \
     hifive1b \
+    ikea-tradfri \
     %-kw41z \
     openlabs-kw41z-mini \
     frdm-k64f \
@@ -21,6 +23,8 @@ BOARDS_TIMER_32kHz := \
     slstk3401a \
     slstk3402a \
     sltb001a \
+    slwstk6000b-% \
+    slwstk6220a \
     stk3600 \
     stk3700 \
     #

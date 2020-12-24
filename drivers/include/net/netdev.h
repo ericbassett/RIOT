@@ -274,6 +274,10 @@ typedef void (*netdev_event_cb_t)(netdev_t *dev, netdev_event_t event);
 
 /**
  * @brief   Driver types for netdev.
+ *
+ * @warning New entries must be added at the bottom of the list
+ *          because the values need to remain constant to
+ *          generate stable L2 addresses.
  * @{
  */
 typedef enum {
@@ -282,10 +286,22 @@ typedef enum {
     NETDEV_AT86RF2XX,
     NETDEV_CC2538,
     NETDEV_DOSE,
+    NETDEV_ENC28J60,
+    NETDEV_KW41ZRF,
+    NETDEV_MRF24J40,
     NETDEV_NRF802154,
+    NETDEV_STM32_ETH,
+    NETDEV_CC110X,
+    NETDEV_SX127X,
+    NETDEV_SAM0_ETH,
     /* add more if needed */
 } netdev_type_t;
 /** @} */
+
+/**
+ * @brief   Will match any device index
+ */
+#define NETDEV_INDEX_ANY    (0xFF)
 
 /**
  * @brief Structure to hold driver state
@@ -433,6 +449,8 @@ typedef struct netdev_driver {
      * @pre     for array types of @ref netopt_t @p max_len must greater or
      *          equal the required length (see
      *          [netopt documentation](@ref net_netopt) for type)
+     * @pre     @p value must have the natural alignment of its type (see
+     *          [netopt documentation](@ref net_netopt) for type)
      *
      * @param[in]   dev     network device descriptor
      * @param[in]   opt     option type
@@ -454,6 +472,8 @@ typedef struct netdev_driver {
      *          for type)
      * @pre     for array types of @ref netopt_t @p value_len must lesser or
      *          equal the required length (see
+     *          [netopt documentation](@ref net_netopt) for type)
+     * @pre     @p value must have the natural alignment of its type (see
      *          [netopt documentation](@ref net_netopt) for type)
      *
      * @param[in]   dev         network device descriptor

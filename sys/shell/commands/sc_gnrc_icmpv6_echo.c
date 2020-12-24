@@ -20,13 +20,14 @@
  */
 
 #ifdef MODULE_GNRC_ICMPV6
+#include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "bitfield.h"
 #include "byteorder.h"
-#include "kernel_types.h"
+#include "sched.h"
 #ifdef MODULE_LUID
 #include "luid.h"
 #endif
@@ -321,7 +322,7 @@ static void _pinger(_ping_data_t *data)
             goto error_exit;
         }
         gnrc_netif_hdr_set_netif(tmp->data, data->netif);
-        LL_PREPEND(pkt, tmp);
+        pkt = gnrc_pkt_prepend(pkt, tmp);
     }
     if (data->datalen >= sizeof(uint32_t)) {
         uint32_t now = xtimer_now_usec();

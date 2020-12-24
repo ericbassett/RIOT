@@ -24,11 +24,13 @@
 #include "assert.h"
 #include "xtimer.h"
 #include "fmt.h"
+#include "kernel_defines.h"
+
 #include "rn2xx3_params.h"
 #include "rn2xx3.h"
 #include "rn2xx3_internal.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    0
 /* Warning: to correctly display the debug message from sleep timer callback,,
    add CFLAGS+=-DTHREAD_STACKSIZE_IDLE=THREAD_STACKSIZE_DEFAULT to the build
    command.
@@ -38,7 +40,7 @@
 /**
  * @brief   Delay when resetting the device, 10ms
  */
-#define RESET_DELAY                 (10UL * US_PER_MS)
+#define RESET_DELAY     (10UL * US_PER_MS)
 
 /*
  * Interrupt callbacks
@@ -231,7 +233,7 @@ int rn2xx3_sys_sleep(rn2xx3_t *dev)
 
     /* Wait a little to check if the device could go to sleep. No answer means
        it worked. */
-    xtimer_usleep(US_PER_MS);
+    xtimer_msleep(1);
 
     DEBUG("[rn2xx3] RESP: %s\n", dev->resp_buf);
     if (rn2xx3_process_response(dev) == RN2XX3_ERR_INVALID_PARAM) {
@@ -255,7 +257,7 @@ int rn2xx3_mac_init(rn2xx3_t *dev)
     rn2xx3_mac_set_retx(dev, LORAMAC_DEFAULT_RETX);
     rn2xx3_mac_set_linkchk_interval(dev, LORAMAC_DEFAULT_LINKCHK);
     rn2xx3_mac_set_rx1_delay(dev, LORAMAC_DEFAULT_RX1_DELAY);
-    rn2xx3_mac_set_ar(dev, LORAMAC_DEFAULT_AR);
+    rn2xx3_mac_set_ar(dev, IS_ACTIVE(CONFIG_RN2XX3_DEFAULT_AR));
     rn2xx3_mac_set_rx2_dr(dev, LORAMAC_DEFAULT_RX2_DR);
     rn2xx3_mac_set_rx2_freq(dev, LORAMAC_DEFAULT_RX2_FREQ);
 

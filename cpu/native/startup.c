@@ -47,7 +47,7 @@
 #include "periph/init.h"
 #include "periph/pm.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG 0
 #include "debug.h"
 
 typedef enum {
@@ -75,7 +75,7 @@ netdev_tap_params_t netdev_tap_params[NETDEV_TAP_MAX];
 #include "board.h"
 #include "mtd_native.h"
 #endif
-#ifdef MODULE_CAN_LINUX
+#ifdef MODULE_PERIPH_CAN
 #include "candev_linux.h"
 #endif
 #ifdef MODULE_PERIPH_SPIDEV_LINUX
@@ -101,7 +101,7 @@ static const char short_opts[] = ":hi:s:deEoc:"
 #ifdef MODULE_MTD_NATIVE
     "m:"
 #endif
-#ifdef MODULE_CAN_LINUX
+#ifdef MODULE_PERIPH_CAN
     "n:"
 #endif
 #ifdef MODULE_SOCKET_ZEP
@@ -127,7 +127,7 @@ static const struct option long_opts[] = {
 #ifdef MODULE_MTD_NATIVE
     { "mtd", required_argument, NULL, 'm' },
 #endif
-#ifdef MODULE_CAN_LINUX
+#ifdef MODULE_PERIPH_CAN
     { "can", required_argument, NULL, 'n' },
 #endif
 #ifdef MODULE_SOCKET_ZEP
@@ -309,13 +309,16 @@ void usage_exit(int status)
 "        times (up to UART_NUMOF)\n"
 #ifdef MODULE_PERIPH_GPIO_LINUX
 "    -g <gpio>, --gpio=<gpio>\n"
-"        specify gpiochip device for GPIO access. This argument can be used multiple times.\n"
+"        specify gpiochip device for GPIO access.\n"
+"        This argument can be used multiple times.\n"
 "        Example: --gpio=/dev/gpiochip0 uses gpiochip0 for port 0\n"
 #endif
 #if defined(MODULE_SOCKET_ZEP) && (SOCKET_ZEP_MAX > 0)
 "    -z [<laddr>:<lport>,]<raddr>:<rport> --zep=[<laddr>:<lport>,]<raddr>:<rport>\n"
-"        provide a ZEP interface with local address and port (<laddr>, <lport>)\n"
-"        and remote address and port (default local: [::]:17754).\n"
+"        provide a ZEP interface with an (optional) local address and port\n"
+"        (<laddr>:<lport>) and a remote address and port (<raddr>:<rport>).\n"
+"        The ZEP interface connects to the remote address and may listen\n"
+"        on a local address.\n"
 "        Required to be provided SOCKET_ZEP_MAX times\n"
 #endif
     );
@@ -324,7 +327,7 @@ void usage_exit(int status)
 "    -m <mtd>, --mtd=<mtd>\n"
 "       specify the file name of mtd emulated device\n");
 #endif
-#if defined(MODULE_CAN_LINUX)
+#if defined(MODULE_PERIPH_CAN)
     real_printf(
 "    -n <ifnum>:<ifname>, --can <ifnum>:<ifname>\n"
 "        specify CAN interface <ifname> to use for CAN device #<ifnum>\n"
@@ -396,8 +399,8 @@ static void _zep_params_setup(char *zep_str, int zep)
     }
     second_ep = strtok_r(NULL, ",", &save_ptr);
     if (second_ep == NULL) {
-        socket_zep_params[zep].local_addr = SOCKET_ZEP_LOCAL_ADDR_DEFAULT;
-        socket_zep_params[zep].local_port = SOCKET_ZEP_PORT_DEFAULT;
+        socket_zep_params[zep].local_addr = NULL;
+        socket_zep_params[zep].local_port = NULL;
         _parse_ep_str(first_ep, &socket_zep_params[zep].remote_addr,
                       &socket_zep_params[zep].remote_port);
     }
@@ -501,7 +504,7 @@ __attribute__((constructor)) static void startup(int argc, char **argv, char **e
                 ((mtd_native_dev_t *)mtd0)->fname = strndup(optarg, PATH_MAX - 1);
                 break;
 #endif
-#if defined(MODULE_CAN_LINUX)
+#if defined(MODULE_PERIPH_CAN)
             case 'n':{
                 int i;
                 i = atol(optarg);

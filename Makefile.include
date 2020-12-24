@@ -378,6 +378,8 @@ ifeq (1,$(TEST_KCONFIG))
   $(info === [ATTENTION] Testing Kconfig dependency modelling ===)
   KCONFIG_MODULES := $(call lowercase,$(patsubst CONFIG_MODULE_%,%,$(filter CONFIG_MODULE_%,$(.VARIABLES))))
   USEMODULE := $(KCONFIG_MODULES)
+  KCONFIG_PACKAGES := $(call lowercase,$(patsubst CONFIG_PACKAGE_%,%,$(filter CONFIG_PACKAGE_%,$(.VARIABLES))))
+  USEPKG := $(KCONFIG_PACKAGES)
 else
   # check if required features are provided and update $(FEATURES_USED)
   include $(RIOTMAKE)/features_check.inc.mk
@@ -394,6 +396,20 @@ INCLUDES += $(addprefix -I,$(wildcard $(BOARDDIR)/include))
 include $(BOARDDIR)/Makefile.include
 INCLUDES += -I$(RIOTCPU)/$(CPU)/include
 include $(RIOTCPU)/$(CPU)/Makefile.include
+
+# Include emulator code if available and if emulate target is used
+ifneq (,$(filter emulate%,$(MAKECMDGOALS)))
+  # Use renode as default emulator
+  RIOT_EMULATOR ?= renode
+  -include $(RIOTMAKE)/tools/$(RIOT_EMULATOR).inc.mk
+endif
+
+# Include common serial logic to define TERMPROG, TERMFLAGS variables based on
+# the content of RIOT_TERMINAL
+include $(RIOTMAKE)/tools/serial.inc.mk
+
+# Include common programmer logic if available
+-include $(RIOTMAKE)/tools/$(PROGRAMMER).inc.mk
 
 # Assume GCC/GNU as supported toolchain if CPU's Makefile.include doesn't
 # provide this macro
@@ -576,9 +592,9 @@ ARCHIVES_GROUP = $(if $(ARCHIVES),$(LINKFLAGPREFIX)--start-group $(ARCHIVES) -lm
 
 $(ELFFILE): FORCE
 ifeq ($(BUILDOSXNATIVE),1)
-  _LINK = $(if $(CPPMIX),$(LINKXX),$(LINK)) $$(find $(BASELIBS:%.module=$(BINDIR)/%/*.o) 2> /dev/null) $(ARCHIVES_GROUP) $(LINKFLAGS) $(LINKFLAGPREFIX)-no_pie
+  _LINK = $(if $(CPPMIX),$(LINKXX),$(LINK)) $$(find $(BASELIBS:%.module=$(BINDIR)/%/) -name "*.o" 2> /dev/null | sort) $(ARCHIVES_GROUP) $(LINKFLAGS) $(LINKFLAGPREFIX)-no_pie
 else
-  _LINK = $(if $(CPPMIX),$(LINKXX),$(LINK)) $$(find $(BASELIBS:%.module=$(BINDIR)/%/*.o) 2> /dev/null) $(ARCHIVES_GROUP) $(LINKFLAGS) $(LINKFLAGPREFIX)-Map=$(BINDIR)/$(APPLICATION).map
+  _LINK = $(if $(CPPMIX),$(LINKXX),$(LINK)) $$(find $(BASELIBS:%.module=$(BINDIR)/%/) -name "*.o" 2> /dev/null | sort) $(ARCHIVES_GROUP) $(LINKFLAGS) $(LINKFLAGPREFIX)-Map=$(BINDIR)/$(APPLICATION).map
 endif # BUILDOSXNATIVE
 
 ifeq ($(BUILD_IN_DOCKER),1)
@@ -644,7 +660,7 @@ endif
 ..compiler-check:
 	$(call check_cmd,$(CC),Compiler)
 
-..build-message:
+..build-message: $(if $(SHOULD_RUN_KCONFIG), check-kconfig-errors)
 	@$(COLOR_ECHO) '$(COLOR_GREEN)Building application "$(APPLICATION)" for "$(BOARD)" with MCU "$(MCU)".$(COLOR_RESET)'
 	@$(COLOR_ECHO)
 
@@ -730,9 +746,21 @@ debug-server:
 	$(call check_cmd,$(DEBUGSERVER),Debug server program)
 	$(DEBUGSERVER) $(DEBUGSERVER_FLAGS)
 
-emulate:
+emulate: all $(EMULATORDEPS)
+ifeq (,$(filter debug%,$(MAKECMDGOALS)))
 	$(call check_cmd,$(EMULATOR),Emulation program)
 	$(EMULATOR) $(EMULATOR_FLAGS)
+else
+	@:
+endif
+
+emulate-only: $(EMULATORDEPS)
+ifeq (,$(filter debug%,$(MAKECMDGOALS)))
+	$(call check_cmd,$(EMULATOR),Emulation program)
+	$(EMULATOR) $(EMULATOR_FLAGS)
+else
+	@:
+endif
 
 reset:
 	$(call check_cmd,$(RESET),Reset program)

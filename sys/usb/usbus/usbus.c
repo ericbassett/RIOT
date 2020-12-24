@@ -32,11 +32,12 @@
 #include "usb.h"
 #include "cpu.h"
 
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG             0
 #include "debug.h"
 
 #define _USBUS_MSG_QUEUE_SIZE    (16)
@@ -118,6 +119,16 @@ uint16_t usbus_add_interface(usbus_t *usbus, usbus_interface_t *iface)
     iface->idx = idx;
     *last = iface;
     return idx;
+}
+
+void usbus_add_interface_alt(usbus_interface_t *iface,
+                             usbus_interface_alt_t *alt)
+{
+    usbus_interface_alt_t **last = &iface->alts;
+    while (*last) {
+        last = &(*last)->next;
+    }
+    *last = alt;
 }
 
 void usbus_register_event_handler(usbus_t *usbus, usbus_handler_t *handler)

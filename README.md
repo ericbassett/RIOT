@@ -86,19 +86,12 @@ For specific toolchain installation, follow instructions in the
   version of the documentation is uploaded daily to
   [riot-os.org/api](https://riot-os.org/api).
 
-### USING THE NATIVE PORT WITH NETWORKING
-If you compile RIOT for the native cpu and include the `netdev_tap` module,
-you can specify a network interface like this: `PORT=tap0 make term`
+## FORUM
+Do you have a question, want to discuss a new feature, or just want to present
+your latest project using RIOT? Come over to our [forum] and post to your hearts
+content.
 
-#### SETTING UP A TAP NETWORK
-There is a shell script in `RIOT/dist/tools/tapsetup` called `tapsetup` which
-you can use to create a network of tap interfaces.
-
-*USAGE*
-
-To create a bridge and two (or `count` at your option) tap interfaces:
-
-    sudo ./dist/tools/tapsetup/tapsetup [-c [<count>]]
+[forum]: https://forum.riot-os.org
 
 ## CONTRIBUTE
 

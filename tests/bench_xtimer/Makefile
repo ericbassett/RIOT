@@ -11,6 +11,7 @@ LOW_MEMORY_BOARDS += \
   arduino-mkrfox1200 \
   arduino-mkrwan1300 \
   arduino-mkrzero \
+  arduino-nano-33-iot \
   atmega1284p \
   b-l072z-lrwan1 \
   blackpill \
@@ -23,8 +24,10 @@ LOW_MEMORY_BOARDS += \
   cc2650-launchpad \
   cc2650stk \
   e104-bt5010a-tb \
+  e104-bt5011a-tb \
   derfmega128 \
   feather-m0 \
+  feather-m0-lora \
   feather-m0-wifi \
   hifive1 \
   hifive1b \

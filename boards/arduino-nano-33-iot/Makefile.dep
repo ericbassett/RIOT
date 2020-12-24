@@ -1,7 +1,6 @@
-USEMODULE += boards_common_arduino-samd21-nina
-
-ifneq (,$(filter netdev_default,$(USEMODULE)))
-  USEMODULE += atwinc15x0
+ifneq (,$(filter saul_default,$(USEMODULE)))
+  USEMODULE += saul_gpio
 endif
 
-include $(RIOTBOARD)/common/arduino-samd21-nina/Makefile.dep
+# setup the samd21 arduino bootloader related dependencies
+include $(RIOTBOARD)/common/samd21-arduino-bootloader/Makefile.dep

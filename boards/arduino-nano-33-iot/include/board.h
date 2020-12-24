@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Inria
+ * Copyright (C) 2020 Inria
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -7,12 +7,11 @@
  */
 
 /**
- * @ingroup     boards_arduino-nano-33-IoT
+ * @ingroup     boards_arduino-nano-33-iot
  * @{
  *
  * @file
  * @brief       Board specific definitions for the Arduino Nano 33 IoT
- *              board
  *
  * @author      Alexandre Abadie <alexandre.abadie@inria.fr>
  */
@@ -21,9 +20,6 @@
 #define BOARD_H
 
 #include "cpu.h"
-#include "periph_conf.h"
-#include "board_common.h"
-#include "arduino_pinmap.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,20 +38,13 @@ extern "C" {
 #define LED0_OFF            (LED_PORT.OUTCLR.reg = LED0_MASK)
 #define LED0_TOGGLE         (LED_PORT.OUTTGL.reg = LED0_MASK)
 
-#define LED0_NAME           "LED(Amber)"
-
+#define LED0_NAME           "LED(Yellow)"
 /** @} */
 
 /**
- * @name    Board configuration for Nina W102 WiFi netdev driver
- * @{
+ * @brief Initialize board specific hardware, including clock, LEDs and std-IO
  */
-#define NINA_W102_PARAM_SPI             SPI_DEV(1)
-#define NINA_W102_PARAM_CS_PIN          GPIO_PIN(PA, 14)
-#define NINA_W102_PARAM_ACK_PIN         GPIO_PIN(PA, 28)
-#define NINA_W102_PARAM_RSTN_PIN        GPIO_PIN(PA, 8)
-#define NINA_W102_PARAM_GPIO0_PIN       GPIO_PIN(PA, 27)
-/** @} */
+void board_init(void);
 
 #ifdef __cplusplus
 }
