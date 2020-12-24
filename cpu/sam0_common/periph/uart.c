@@ -25,9 +25,11 @@
  */
 
 #include "cpu.h"
-
+#include "mutex.h"
+#include "assert.h"
 #include "periph/uart.h"
 #include "periph/gpio.h"
+#include "pm_layered.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -89,6 +91,29 @@ static void _set_baud(uart_t uart, uint32_t baudrate)
 
     uint8_t scale = 20 - pow;
     dev(uart)->BAUD.reg = (tmp << scale) - (rem << scale) / f_src;
+#endif
+}
+
+#ifdef MODULE_PERIPH_DMA
+struct dma_state {
+    dma_t tx_dma;
+    dma_t rx_dma;
+};
+
+static struct dma_state _dma_state[UART_NUMOF];
+
+// static DmacDescriptor DMA_DESCRIPTOR_ATTRS tx_desc[UART_NUMOF];
+// static DmacDescriptor DMA_DESCRIPTOR_ATTRS rx_desc[UART_NUMOF];
+#endif
+
+static inline bool _use_dma(uart_t uart)
+{
+#ifdef MODULE_PERIPH_DMA
+    return (uart_config[uart].tx_trigger != DMA_TRIGGER_DISABLED) ||
+           (uart_config[uart].rx_trigger != DMA_TRIGGER_DISABLED);
+#else
+    (void)uart;
+    return false;
 #endif
 }
 
@@ -214,7 +239,22 @@ int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, void *arg)
 #else
     /* enable TXE ISR */
     NVIC_EnableIRQ(SERCOM0_0_IRQn + (sercom_id(dev(uart)) * 4));
-#endif
+#endif /* UART_HAS_TX_ISR */
+#else  /* MODULE_PERIPH_UART_NONBLOCKING */
+#ifdef MODULE_PERIPH_DMA
+    if (_use_dma(uart)) {
+        // _dma_state[uart].rx_dma = dma_acquire_channel();
+        _dma_state[uart].tx_dma = dma_acquire_channel();
+        dma_setup(_dma_state[uart].tx_dma,
+                  uart_config[uart].tx_trigger, 0, true);
+        // dma_setup(_dma_state[uart].rx_dma,
+        //           uart_config[uart].rx_trigger, 1, true);
+        // dma_prepare(_dma_state[uart].rx_dma, DMAC_BTCTRL_BEATSIZE_BYTE_Val,
+        //             (void*)&dev(uart)->DATA.reg, NULL, 1, 0);
+        dma_prepare(_dma_state[uart].tx_dma, DMAC_BTCTRL_BEATSIZE_BYTE_Val,
+                    NULL, (void*)&dev(uart)->DATA.reg, 0, 0);
+    }
+#endif /* MODULE_PERIPH_DMA */
 #endif /* MODULE_PERIPH_UART_NONBLOCKING */
 
     while (dev(uart)->SYNCBUSY.bit.CTRLB) {}
@@ -261,6 +301,33 @@ void uart_deinit_pins(uart_t uart)
 #endif
 }
 
+#ifdef MODULE_PERIPH_DMA
+
+static void _dma_execute(uart_t uart)
+{
+#if defined(CPU_COMMON_SAMD21)
+    pm_block(SAMD21_PM_IDLE_1);
+#endif
+    // dma_start(_dma_state[uart].rx_dma);
+    (void) _dma_state[uart].rx_dma;
+    dma_start(_dma_state[uart].tx_dma);
+
+    // dma_wait(_dma_state[uart].rx_dma);
+#if defined(CPU_COMMON_SAMD21)
+    pm_unblock(SAMD21_PM_IDLE_1);
+#endif
+}
+
+static void _dma_write(uart_t uart, const uint8_t *out, size_t len)
+{
+    assert(out);
+    const uint8_t *out_addr = out + len;
+    dma_prepare_src(_dma_state[uart].tx_dma, out_addr, len, true);
+    _dma_execute(uart);
+}
+
+#endif /* MODULE_PERIPH_DMA */
+
 void uart_write(uart_t uart, const uint8_t *data, size_t len)
 {
     if (uart_config[uart].tx_pin == GPIO_UNDEF) {
@@ -283,12 +350,18 @@ void uart_write(uart_t uart, const uint8_t *data, size_t len)
         dev(uart)->INTENSET.reg = SERCOM_USART_INTENSET_DRE;
     }
 #else
+#ifdef MODULE_PERIPH_DMA
+    // wait for previous write to finish before sending next
+    _dma_write(uart, data, len);
+    dma_wait(_dma_state[uart].tx_dma);
+#else
     for (const void* end = data + len; data != end; ++data) {
         while (!dev(uart)->INTFLAG.bit.DRE) {}
         dev(uart)->DATA.reg = *data;
     }
     while (!dev(uart)->INTFLAG.bit.TXC) {}
-#endif
+#endif /* MODULE_PERIPH_DMA */
+#endif /* MODULE_PERIPH_UART_NONBLOCKING */
 }
 
 void uart_poweron(uart_t uart)

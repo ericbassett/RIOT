@@ -65,16 +65,21 @@ ssize_t stdio_read(void* buffer, size_t len)
 {
     (void)buffer;
     (void)len;
+    unsigned old;
+    (void) old;
+    // old = irq_disable();
     ssize_t ret = isrpipe_read(&_cdc_stdio_isrpipe, buffer, len);
     if (data_in_ep_disabled && ret > 0) {      
-      // gpio_clear(LED0_PIN);
       // data_in_ep_disabled = false;
       // usbus_event_post(cdcacm.usbus, &cdcacm.retry);      
-      if (tsrb_free(&_cdc_stdio_isrpipe.tsrb) >= bulk_out_maxpacketsize) {        
+      // printf("\n\nempty read buffer\n\n");
+      if (tsrb_empty(&_cdc_stdio_isrpipe.tsrb)) {             
+        (void) bulk_out_maxpacketsize;  
         data_in_ep_disabled = false;
         usbus_event_post(cdcacm.usbus, &cdcacm.retry);
       }      
     }
+    // irq_restore(old);
     return ret;
 }
 
@@ -100,7 +105,7 @@ static size_t _cdc_acm_rx_pipe(usbus_cdcacm_device_t *cdcacm,
 
     if (len > tsrb_free(&_cdc_stdio_isrpipe.tsrb)) {
       data_in_ep_disabled = true;
-      // gpio_set(LED0_PIN);
+      // printf("\n\nfull read buffer\n\n");
       return 0;
     }
     for (i = 0; i < len; i++) {
@@ -110,8 +115,7 @@ static size_t _cdc_acm_rx_pipe(usbus_cdcacm_device_t *cdcacm,
         break;
       }     
     }
-    if (i != len) gpio_set(LED0_PIN);
-    return i;
+    return len;
 }
 
 void usb_cdc_acm_stdio_init(usbus_t *usbus)

@@ -488,6 +488,7 @@ static void _ep_enable(usbdev_ep_t *ep)
  */
 void isr_usb(void)
 {
+
     /* TODO: make a bit more elegant for multi-periph support */
     sam0_common_usb_t *dev = &_usbdevs[0];
 
@@ -497,6 +498,7 @@ void isr_usb(void)
         UsbDeviceEndpoint *ep_reg =
             &dev->config->device->DeviceEndpoint[ep_num];
         if (_ep_in_flags_set(ep_reg)) {
+            gpio_set(LED0_PIN);
             usbdev_ep_t *ep = _get_ep(dev, ep_num, USB_EP_DIR_IN);
             _disable_ep_irq_in(ep_reg);
             dev->usbdev.epcb(ep, USBDEV_EVENT_ESR);
@@ -514,7 +516,8 @@ void isr_usb(void)
         /* Device interrupt */
         _disable_irq(dev);
         dev->usbdev.cb(&dev->usbdev, USBDEV_EVENT_ESR);
-    }
+    } 
+    
     cortexm_isr_end();
 }
 
@@ -760,7 +763,7 @@ static void _usbdev_ep_esr(usbdev_ep_t *ep)
         }
     }
     else {
-        if (ep_reg->EPINTFLAG.bit.TRCPT1) {
+        if (ep_reg->EPINTFLAG.bit.TRCPT1) {            
             DEBUG("sam_usb: Transfer IN complete\n");
             ep_reg->EPINTFLAG.reg = USB_DEVICE_EPINTFLAG_TRCPT1;
             event = USBDEV_EVENT_TR_COMPLETE;

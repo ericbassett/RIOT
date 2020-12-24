@@ -180,7 +180,6 @@ static void _set_ep_event(usbus_t *usbus, usbdev_ep_t *ep)
         usbus->ep_events |= _get_ep_bitflag(ep);
         irq_restore(state);
     }
-
     thread_flags_set(thread_get(usbus->pid), USBUS_THREAD_FLAG_USBDEV_EP);
 }
 
@@ -253,17 +252,21 @@ static void *_usbus_thread(void *args)
         usbdev_set(dev, USBOPT_ATTACH, &_enable,
                    sizeof(usbopt_enable_t));
     }
-
+    int i_tog = 1;
     while (1) {
         thread_flags_t flags = thread_flags_wait_any(
             USBUS_THREAD_FLAG_USBDEV |
             USBUS_THREAD_FLAG_USBDEV_EP |
             THREAD_FLAG_EVENT
-            );
+            );         
+        if (!(i_tog % 100)) { }    
         if (flags & USBUS_THREAD_FLAG_USBDEV) {
+            // DEBUG("usbus: USBUS_THREAD_FLAG_USBDEV start");
             usbdev_esr(dev);
+            // DEBUG("usbus: USBUS_THREAD_FLAG_USBDEV finish");
         }
-        if (flags & USBUS_THREAD_FLAG_USBDEV_EP) {
+        if (flags & USBUS_THREAD_FLAG_USBDEV_EP) {            
+            // DEBUG("usbus: USBUS_THREAD_FLAG_USBDEV_EP start");
             uint32_t events = _get_and_reset_ep_events(usbus);
             while (events) {
                 unsigned num = bitarithm_lsb(events);
@@ -272,19 +275,23 @@ static void *_usbus_thread(void *args)
                     /* OUT endpoint */
                     usbdev_ep_esr(usbus->ep_out[num].ep);
                 }
-                else {
+                else {                    
                     /* IN endpoint */
                     usbdev_ep_esr(usbus->ep_in[num - USBDEV_NUM_ENDPOINTS].ep);
                 }
             }
+            // DEBUG("usbus: USBUS_THREAD_FLAG_USBDEV finish");
 
         }
         if (flags & THREAD_FLAG_EVENT) {
+            // DEBUG("usbus: THREAD_FLAG_EVENT start");
             event_t *event = event_get(&usbus->queue);
             if (event) {
                 event->handler(event);
             }
+            // DEBUG("usbus: THREAD_FLAG_EVENT finish");
         }
+        i_tog++;
 
     }
     return NULL;
@@ -334,10 +341,10 @@ static void _event_cb(usbdev_t *usbdev, usbdev_event_t event)
 
 /* USB generic endpoint callback */
 static void _event_ep_cb(usbdev_ep_t *ep, usbdev_event_t event)
-{
+{   
     usbus_t *usbus = (usbus_t *)ep->dev->context;
 
-    if (event == USBDEV_EVENT_ESR) {
+    if (event == USBDEV_EVENT_ESR) {         
         _set_ep_event(usbus, ep);
     }
     else {

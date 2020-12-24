@@ -236,6 +236,10 @@ typedef struct {
     uart_txpad_t tx_pad;    /**< pad selection for TX line */
     uart_flag_t flags;      /**< set optional SERCOM flags */
     uint8_t gclk_src;       /**< GCLK source which supplys SERCOM */
+#ifdef MODULE_PERIPH_DMA
+    uint8_t tx_trigger;     /**< DMA trigger */
+    uint8_t rx_trigger;     /**< DMA trigger */
+#endif
 } uart_conf_t;
 
 enum {

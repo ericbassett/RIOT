@@ -49,6 +49,10 @@ static const uart_conf_t uart_config[] = {
         .tx_pad   = UART_PAD_TX_2,
         .flags    = UART_FLAG_NONE,
         .gclk_src = SAM0_GCLK_MAIN,
+#ifdef MODULE_PERIPH_DMA
+        .tx_trigger = DMA_TRIGGER_DISABLED,
+        .rx_trigger = DMA_TRIGGER_DISABLED,
+#endif        
     },
     {
         .dev      = &SERCOM3->USART,
@@ -63,6 +67,10 @@ static const uart_conf_t uart_config[] = {
         .tx_pad   = UART_PAD_TX_0,
         .flags    = UART_FLAG_NONE,
         .gclk_src = SAM0_GCLK_MAIN,
+#ifdef MODULE_PERIPH_DMA
+        .tx_trigger = SERCOM3_DMAC_ID_TX,
+        .rx_trigger = SERCOM3_DMAC_ID_RX,
+#endif        
     }
 };
 

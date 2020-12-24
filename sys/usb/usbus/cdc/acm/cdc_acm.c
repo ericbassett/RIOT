@@ -163,7 +163,6 @@ size_t usbus_cdc_acm_submit(usbus_cdcacm_device_t *cdcacm, const uint8_t *buf, s
     if (len > n) {
         n += tsrb_drop(&cdcacm->tsrb, len - n);
         buf += len - n;
-        gpio_set(LED0_PIN);
     } else {
         n = len;
     }
@@ -357,6 +356,7 @@ static void _transfer_handler(usbus_t *usbus, usbus_handler_t *handler,
           if(cdcacm->cb(cdcacm, ep->buf, len)) {
             usbdev_ep_ready(ep, 0);
           }
+        //   usbdev_ep_ready(ep, 0);
         }
     }
     if ((ep->dir == USB_EP_DIR_IN) && (ep->type == USB_EP_TYPE_BULK)) {
@@ -380,10 +380,9 @@ static void _handle_retry(event_t *ev)
 {
     usbus_cdcacm_device_t *cdcacm = container_of(ev, usbus_cdcacm_device_t,
                                                  retry);
-    usbdev_ep_t *ep_bulk_out = cdcacm->iface_data.ep->ep;
+    usbdev_ep_t *ep_bulk_out = cdcacm->iface_data.ep->next->ep;
     (void) ep_bulk_out;
     (void) cdcacm;
-    // gpio_set(LED0_PIN);
 
     _transfer_handler(cdcacm->usbus, (usbus_handler_t *) &cdcacm,
                                 ep_bulk_out, USBUS_EVENT_TRANSFER_COMPLETE);
