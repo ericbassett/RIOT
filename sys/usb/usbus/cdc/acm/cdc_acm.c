@@ -381,7 +381,7 @@ static void _handle_retry(event_t *ev)
 {
     usbus_cdcacm_device_t *cdcacm = container_of(ev, usbus_cdcacm_device_t,
                                                  retry);
-    usbdev_ep_t *ep_bulk_out = cdcacm->iface_data.ep->next->ep;
+    usbdev_ep_t *ep_bulk_out = cdcacm->iface_data.ep->ep;
     (void) ep_bulk_out;
     (void) cdcacm;
 
